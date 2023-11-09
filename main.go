@@ -32,9 +32,11 @@ func main() {
 	router.PUT("/user/username/:id", controllers.UpdateUsernameById)
 	router.PUT("/user/foto/:id", controllers.UpdatePhotoProfile)
 	adminGroup.DELETE("/user/delete/:id", admin.DeleteUser)
-	router.GET("/user/cart/:id", controllers.GetCardByUserId)
 
 	router.GET("/product", controllers.GetProduct)
+
+	router.POST("/cart", controllers.AddCart)
+	userAuth.POST("/user/cart", controllers.GetCartByUserId)
 
 	router.Run()
 }

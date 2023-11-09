@@ -228,17 +228,23 @@ func IsValidMIMEType(file *multipart.FileHeader, allowedMIMETypes []string) bool
 	return false
 }
 
-func GetCardByUserId(c *gin.Context) {
-	id := c.Param("id")
+func GetCartByUserId(c *gin.Context) {
+	user, _ := c.Get("userMap")
 
-	var cart []models.Cart
-	initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", id).First(&cart)
+	if user != nil {
+		userMap, isMap := user.(map[string]interface{})
 
-	if cart != nil {
-		c.JSON(http.StatusOK, cart)
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"Error": "Pengguna Tidak Memiliki Keranjang Belanja",
-		})
+		if isMap {
+			if userID, ok := userMap["ID"].(uint); ok {
+				var cart []models.Cart
+				initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", userID).Find(&cart)
+
+				c.JSON(http.StatusOK, cart)
+				return
+			}
+		}
 	}
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error": "Pengguna Tidak Memiliki Keranjang Belanja",
+	})
 }
