@@ -11,9 +11,9 @@ import (
 func AddCart(c *gin.Context) {
 	var addCartBody struct {
 		ID        uint
-		UserID    uint `json:"user_id"`
-		ProductID uint `json:"product_id"`
-		Quantity  uint `json:"quantity"`
+		Userid    uint
+		Productid uint
+		Quantity  uint
 		CreatedAt time.Time
 		UpdatedAt time.Time
 	}
@@ -26,11 +26,11 @@ func AddCart(c *gin.Context) {
 	}
 
 	var existingCart models.Cart
-	result := initializers.DB.Where("user_id = ? AND product_id = ?", addCartBody.UserID, addCartBody.ProductID).First(&existingCart)
+	result := initializers.DB.Where("user_id = ? AND product_id = ?", addCartBody.Userid, addCartBody.Productid).First(&existingCart)
 	if result.Error != nil {
 		userCart := models.Cart{
-			UserID:    addCartBody.UserID,
-			ProductID: addCartBody.ProductID,
+			UserID:    addCartBody.Userid,
+			ProductID: addCartBody.Productid,
 			Quantity:  addCartBody.Quantity,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
@@ -54,7 +54,7 @@ func AddCart(c *gin.Context) {
 	}
 
 	var cart []models.Cart
-	initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", addCartBody.UserID).Find(&cart)
+	initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", addCartBody.Userid).Find(&cart)
 
 	c.JSON(http.StatusOK, cart)
 }
