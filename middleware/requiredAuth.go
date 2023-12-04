@@ -46,13 +46,6 @@ func RequiredAuth(c *gin.Context) {
 		if user[0].ID == 0 {
 			c.AbortWithStatus(http.StatusUnauthorized)
 		}
-
-		userMap := map[string]interface{}{
-			"ID": user[0].ID,
-			// Data pengguna lainnya, jika diperlukan
-		}
-
-		c.Set("userMap", userMap)
 		// Attack to req
 		c.Set("user", user)
 

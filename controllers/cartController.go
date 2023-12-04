@@ -54,7 +54,33 @@ func AddCart(c *gin.Context) {
 	}
 
 	var cart []models.Cart
-	initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", addCartBody.Userid).Find(&cart)
+	initializers.DB.Preload("Product").Preload("Product.User").Where("user_id = ?", addCartBody.Userid).Find(&cart)
+
+	c.JSON(http.StatusOK, cart)
+}
+
+func RemoveCart(c *gin.Context) {
+	userID := c.Param("userid")
+	productID := c.Param("productid")
+
+	var cart []models.Cart
+	del := initializers.DB.Where("user_id = ? AND product_id = ?", userID, productID).Delete(&cart)
+
+	if del.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Error": "Terjadi kesalahan dalam mencari pengguna.",
+		})
+		return
+	}
+
+	result := initializers.DB.Preload("Product").Preload("Product.User").Where("user_id = ?", userID).Find(&cart)
+
+	if result.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"Error": "Terjadi kesalahan dalam mencari pengguna.",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, cart)
 }

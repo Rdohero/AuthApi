@@ -4,6 +4,7 @@ import "time"
 
 type Product struct {
 	ID          uint      `gorm:"primarykey" json:"id"`
+	UserID      uint      `json:"user_id"`
 	Image       string    `json:"image"`
 	Name        string    `json:"name"`
 	Price       float64   `json:"price"`
@@ -11,5 +12,5 @@ type Product struct {
 	Description string    `gorm:"type:text" json:"description"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
-	Carts       []Cart
+	User        User      `gorm:"foreignKey:UserID"`
 }

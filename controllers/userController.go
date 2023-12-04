@@ -6,13 +6,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
 	"mime/multipart"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -66,7 +70,7 @@ func checkPasswordCriteria(password string) error {
 		}
 	}
 	// check password length
-	if 8 < len(password) && len(password) < 60 {
+	if 7 < len(password) && len(password) < 60 {
 		pswdLength = true
 	}
 	// create error for any criteria not passed
@@ -118,7 +122,7 @@ func checkEmailDomain(email string) error {
 	// func LookupMX(name string) ([]*MX, error)
 	_, err := net.LookupMX(host)
 	if err != nil {
-		err = errors.New("Could not find email's domain server, please chack and try again")
+		err = errors.New("Could not find email's domain server, please check and try again")
 		return err
 	}
 	return nil
@@ -188,10 +192,11 @@ func UpdatePhotoProfile(c *gin.Context) {
 		return
 	}
 	// Define the path where the file will be saved
-	filePath := filepath.Join("images", file.Filename)
+	basePath := filepath.Join("images", file.Filename)
 	// Create the "images" directory if it doesn't exist
 	os.MkdirAll("images", os.ModePerm)
 	// Save the file to the defined path
+	filePath := generateUniqueFileName(basePath)
 	c.SaveUploadedFile(file, filePath)
 
 	user1[0].Foto = filePath
@@ -228,23 +233,115 @@ func IsValidMIMEType(file *multipart.FileHeader, allowedMIMETypes []string) bool
 	return false
 }
 
-func GetCartByUserId(c *gin.Context) {
-	user, _ := c.Get("userMap")
-
-	if user != nil {
-		userMap, isMap := user.(map[string]interface{})
-
-		if isMap {
-			if userID, ok := userMap["ID"].(uint); ok {
-				var cart []models.Cart
-				initializers.DB.Preload("Product").Preload("User").Where("user_id = ?", userID).Find(&cart)
-
-				c.JSON(http.StatusOK, cart)
-				return
-			}
-		}
+func ForgotPassword(c *gin.Context) {
+	var ForgotPwd struct {
+		Password string
+		Email    string
+		Otp      string
 	}
-	c.JSON(http.StatusBadRequest, gin.H{
-		"error": "Pengguna Tidak Memiliki Keranjang Belanja",
+	c.Bind(&ForgotPwd)
+
+	checkPassword := checkPasswordCriteria(ForgotPwd.Password)
+	if checkPassword != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": checkPassword.Error(),
+		})
+		return
+	}
+
+	var user models.User
+
+	initializers.DB.Where("email = ?", ForgotPwd.Email).First(&user)
+
+	if user.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"Error": "User not found",
+		})
+		return
+	}
+
+	var tokenString, err = DapatkanOtpString(ForgotPwd.Otp)
+
+	if tokenString == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"Error": err.Error(),
+		})
+		return
+	}
+
+	token, _ := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return []byte(os.Getenv("SECRET")), nil
 	})
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		// Check the exp
+		if float64(time.Now().Unix()) > claims["exp"].(float64) {
+			HapusOtp(ForgotPwd.Otp)
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"Error": "Otp Has Been Expired",
+			})
+			return
+		}
+
+		if ForgotPwd.Email == user.Email {
+			if ForgotPwd.Otp == strconv.Itoa(int(claims["otp"].(float64))) {
+				hash, _ := bcrypt.GenerateFromPassword([]byte(ForgotPwd.Password), 14)
+
+				initializers.DB.First(&user).Update("password", string(hash))
+
+				HapusOtp(ForgotPwd.Otp)
+
+				c.JSON(http.StatusOK, gin.H{
+					"Status": "Succes",
+				})
+				return
+			} else {
+				c.JSON(http.StatusUnauthorized, gin.H{
+					"Error": "Otp Not Valid",
+				})
+			}
+		} else {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"Error": "Otp Not Valid",
+			})
+		}
+	} else {
+		HapusOtp(ForgotPwd.Otp)
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"Error": "Otp Has Been Expired",
+		})
+		return
+	}
+}
+
+func GetCartByUserId(c *gin.Context) {
+	var id = c.Param("id")
+
+	var cart []models.Cart
+	initializers.DB.Preload("Product").Preload("Product.User").Where("user_id = ?", id).Find(&cart)
+
+	c.JSON(http.StatusOK, cart)
+}
+
+func generateUniqueFileName(basePath string) string {
+	extension := filepath.Ext(basePath)
+	name := strings.TrimSuffix(basePath, extension)
+
+	counter := 1
+	for {
+		newPath := basePath
+		if counter > 1 {
+			newPath = fmt.Sprintf("%s_%d%s", name, counter, extension)
+		}
+
+		if _, err := os.Stat(newPath); os.IsNotExist(err) {
+			return newPath
+		}
+
+		counter++
+	}
 }

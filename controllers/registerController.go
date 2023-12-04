@@ -14,8 +14,6 @@ import (
 	"time"
 )
 
-var TokenString string
-
 func Signup(c *gin.Context) {
 	// Get the email/pass off req body
 	var body struct {
@@ -27,7 +25,7 @@ func Signup(c *gin.Context) {
 
 	if c.Bind(&body) != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to read body",
+			"Error": "Failed to read body",
 		})
 
 		return
@@ -37,7 +35,7 @@ func Signup(c *gin.Context) {
 	checkPassword := checkPasswordCriteria(body.Password)
 	if checkPassword != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"StatusPassword": checkPassword.Error(),
+			"Error": checkPassword.Error(),
 		})
 	}
 
@@ -45,7 +43,7 @@ func Signup(c *gin.Context) {
 	checkUsername := checkUsernameCriteria(body.Username)
 	if checkUsername != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"StatusUsername": checkUsername.Error(),
+			"Error": checkUsername.Error(),
 		})
 	}
 
@@ -53,7 +51,7 @@ func Signup(c *gin.Context) {
 	checkEmail := checkEmailValid(body.Email)
 	if checkEmail != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"StatusEmail": checkEmail.Error(),
+			"Error": checkEmail.Error(),
 		})
 	}
 
@@ -61,7 +59,7 @@ func Signup(c *gin.Context) {
 	checkEmailD := checkEmailDomain(body.Email)
 	if checkEmailD != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"StatusEmailD": checkEmailD.Error(),
+			"Error": checkEmailD.Error(),
 		})
 	}
 	//Hash the password
@@ -69,7 +67,7 @@ func Signup(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Failed to hash password",
+			"Error": "Failed to hash password",
 		})
 
 		return
@@ -80,14 +78,13 @@ func Signup(c *gin.Context) {
 
 		otpStr := fmt.Sprintf("%06d", otp)
 
-		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		token, _ := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"email": body.Email,
 			"otp":   otp,
-			"exp":   time.Now().Add(time.Hour).Unix(),
-		})
+			"exp":   time.Now().Add(time.Minute * 2).Unix(),
+		}).SignedString([]byte(os.Getenv("SECRET")))
 
-		TokenString, _ = token.SignedString([]byte(os.Getenv("SECRET")))
-
+		SimpanOtp(otpStr, token)
 		// Create the user
 		user := models.User{Fullname: body.Fullname, Username: body.Username, Email: body.Email, Password: string(hash), Active: false}
 		result := initializers.DB.Create(&user)
