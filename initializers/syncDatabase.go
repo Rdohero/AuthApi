@@ -9,5 +9,5 @@ func SyncDatabase() {
 	//DB.AutoMigrate(&models.Payment{})
 	//DB.AutoMigrate(&models.Invoice{})
 	//DB.AutoMigrate(&models.Status{})
-	//DB.AutoMigrate(&models.InvoiceItem{})
+	//DB.AutoMigrate(&models.Image{})
 }

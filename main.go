@@ -5,7 +5,6 @@ import (
 	"AuthApi/controllers/admin"
 	"AuthApi/initializers"
 	"AuthApi/middleware"
-	"AuthApi/models"
 	"github.com/gin-gonic/gin"
 )
 
@@ -13,73 +12,6 @@ func init() {
 	initializers.LoadEnvVariables()
 	initializers.ConnectToDb()
 	initializers.SyncDatabase()
-}
-
-func Transaction(c *gin.Context) {
-	// Start a transaction
-	var Transaksi struct {
-		Penjual string
-		Pembeli string
-		Harga   int
-	}
-
-	c.Bind(&Transaksi)
-
-	tx := initializers.DB.Begin()
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			c.JSON(500, gin.H{"error": "Transaction failed"})
-		}
-	}()
-
-	// Check for errors during the transaction
-	if tx.Error != nil {
-		c.JSON(500, gin.H{"error": "Error starting transaction"})
-		return
-	}
-
-	// Retrieve user1 and user2 from the database
-	var penjual, pembeli models.TestTransaction
-	tx.First(&pembeli, "name = ?", Transaksi.Pembeli)
-
-	if tx.Error != nil || pembeli.ID == 0 {
-		tx.Rollback()
-		c.JSON(404, gin.H{"error": "User not found"})
-		return
-	}
-
-	// Check if user1 has sufficient balance
-	if pembeli.Balance < Transaksi.Harga {
-		tx.Rollback()
-		c.JSON(400, gin.H{"error": "Insufficient balance"})
-		return
-	}
-
-	pembeli.Balance -= Transaksi.Harga
-	tx.Save(&pembeli)
-
-	// Check if the users exist
-
-	tx.First(&penjual, "name = ?", Transaksi.Penjual)
-
-	if tx.Error != nil || penjual.ID == 0 {
-		tx.Rollback()
-		c.JSON(404, gin.H{"error": "User not found"})
-		return
-	}
-
-	// Perform the transaction
-	penjual.Balance += Transaksi.Harga
-
-	// Update user1 and user2 balances
-	tx.Save(&penjual)
-
-	// Commit the transaction
-	tx.Commit()
-
-	c.JSON(200, gin.H{"message": "Transaction successful"})
 }
 
 func main() {
@@ -91,8 +23,6 @@ func main() {
 	userAuth.Use(middleware.RequiredAuth)
 
 	router.Static("/images", "images/")
-
-	router.POST("/perform-transaction", Transaction)
 
 	router.POST("/signup", controllers.Signup)
 	router.POST("/emailve", controllers.OtpEmailVer)
@@ -122,6 +52,8 @@ func main() {
 
 	router.GET("/payment", controllers.MetodePembayaran)
 	router.POST("/payment", controllers.Payment)
+
+	router.POST("/save-image", controllers.SaveImage)
 
 	router.Run()
 }
