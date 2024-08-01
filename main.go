@@ -3,6 +3,7 @@ package main
 import (
 	"AuthApi/controllers"
 	"AuthApi/controllers/admin"
+	"AuthApi/controllers/firebase"
 	"AuthApi/initializers"
 	"AuthApi/middleware"
 	"github.com/gin-gonic/gin"
@@ -12,6 +13,7 @@ func init() {
 	initializers.LoadEnvVariables()
 	initializers.ConnectToDb()
 	initializers.SyncDatabase()
+	initializers.ConnectToFirebase()
 }
 
 func main() {
@@ -54,6 +56,9 @@ func main() {
 	router.POST("/payment", controllers.Payment)
 
 	router.POST("/save-image", controllers.SaveImage)
+
+	router.POST("/message", firebase.Message)
+	router.POST("/message/array", firebase.MessageArray)
 
 	router.Run()
 }
